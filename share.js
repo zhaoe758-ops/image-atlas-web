@@ -35,8 +35,8 @@ export function mountShare(images, isDemo) {
     busy = true; action.disabled = true; close.disabled = true;
     try {
       status.textContent = '正在打包页面…';
-      const [shell, baseStyle, libraryStyle, script, license] = await Promise.all([
-        getText('index.html'), getText('styles.css'), getText('library.css'), getText('app.js'), getText('LICENSE')
+      const [shell, baseStyle, libraryStyle, script, license, photoActions] = await Promise.all([
+        getText('index.html'), getText('styles.css'), getText('library.css'), getText('app.js'), getText('LICENSE'), getText('photo-actions.js')
       ]);
       const paths = [...new Set(images.flatMap(image => [image.src,image.full]))];
       const assets = [], positions = new Map();
@@ -45,7 +45,7 @@ export function mountShare(images, isDemo) {
         positions.set(paths[i],i); assets.push(await imageData(paths[i]));
       }
       const records = images.map(record => ({...record,src:positions.get(record.src),full:positions.get(record.full)}));
-      const html = assembleSharePage({shell,css:baseStyle+'\n'+libraryStyle,script,records,assets,license});
+      const html = assembleSharePage({shell,css:baseStyle+'\n'+libraryStyle,script,records,assets,license,photoActions});
       const blob = new Blob([html],{type:'text/html;charset=utf-8'});
       if (downloadURL) URL.revokeObjectURL(downloadURL);
       downloadURL = URL.createObjectURL(blob);

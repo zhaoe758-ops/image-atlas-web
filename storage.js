@@ -32,6 +32,17 @@ export async function savePhoto(record) {
   });
 }
 
+export async function deletePhoto(id) {
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction('photos', 'readwrite');
+    transaction.objectStore('photos').delete(id);
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error || new Error('照片删除失败，请重试。'));
+    transaction.onerror = () => {};
+  });
+}
+
 export async function preparePhoto(file, yearOverride) {
   if (!/\.(jpe?g|png|webp)$/i.test(file.name)) throw new Error('请使用 JPG、PNG 或 WebP 照片。');
   const bytes = await file.arrayBuffer();

@@ -1,5 +1,7 @@
 import { initialImages as images, isDemo, mountLibrary } from './library.js';
 import { mountShare } from './share.js';
+import { deletePhoto } from './storage.js';
+import { mountPhotoActions } from './photo-actions.js';
 const $=s=>document.querySelector(s);
 const space=$('#space'),world=$('#world'),input=$('#search'),suggestions=$('#suggestions'),selection=$('#selection'),announcer=$('#announcer');
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -54,9 +56,88 @@ $('#search-form').addEventListener('submit',e=>{e.preventDefault();if(!input.val
 function adjacent(step){if(!selected)return;const list=cards.filter(c=>activeYear===null||c.record.year===activeYear);focusCard(list[(list.indexOf(selected)+step+list.length)%list.length])}$('#previous').addEventListener('click',()=>adjacent(-1));$('#next').addEventListener('click',()=>adjacent(1));
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('.search-shell'))closeSuggestions()});document.addEventListener('keydown',e=>{if(e.isComposing||document.querySelector('dialog[open]'))return;if(e.key==='Escape'){input.blur();goHome()}if(e.key==='/'&&document.activeElement!==input){e.preventDefault();input.focus()}if(e.target instanceof HTMLInputElement)return;if(selected&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();adjacent(e.key==='ArrowLeft'?-1:1);return}const move={ArrowLeft:[-180,0],ArrowRight:[180,0],ArrowUp:[0,-150],ArrowDown:[0,150]}[e.key];if(move&&!flight){e.preventDefault();releaseFocus();desired.x+=move[0];desired.y+=move[1]}});
 function releaseFocus(){if(flight){flight.resolve({cancelled:true});flight=null;Object.assign(desired,camera)}selected=null;selection.hidden=true;document.body.classList.remove('focused','flying');cards.forEach(setCardTransform);lastFrame=''}
-const pointers=new Map();space.addEventListener('pointerdown',e=>{if(e.button!==0)return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const[a,b]=[...pointers.values()];pinch={distance:Math.hypot(a.x-b.x,a.y-b.y),z:desired.z};dragMoved=true}dragging=true;pointerStart={x:e.clientX,y:e.clientY,cx:desired.x,cy:desired.y};if(pointers.size===1)dragMoved=false;space.setPointerCapture(e.pointerId);space.classList.add('dragging')});
-space.addEventListener('pointermove',e=>{if(!dragging)return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2&&pinch){const[a,b]=[...pointers.values()];releaseFocus();desired.z=Math.max(-9000,Math.min(4500,pinch.z-(Math.hypot(a.x-b.x,a.y-b.y)-pinch.distance)*7));return}const dx=e.clientX-pointerStart.x,dy=e.clientY-pointerStart.y;if(Math.hypot(dx,dy)>5){if(!dragMoved)releaseFocus();dragMoved=true}if(dragMoved){const factor=Math.max(.5,(camera.z-(activeYear?planes.get(activeYear):0))/focal);desired.x=pointerStart.cx-dx*factor;desired.y=pointerStart.cy-dy*factor;desired.yaw=0;desired.pitch=0}});
-space.addEventListener('pointerup',e=>{const moved=dragMoved;pointers.delete(e.pointerId);if(space.hasPointerCapture(e.pointerId))space.releasePointerCapture(e.pointerId);if(!pointers.size){dragging=false;pinch=null;space.classList.remove('dragging');if(!moved&&!flight){const el=document.elementFromPoint(e.clientX,e.clientY)?.closest('.image-card');const card=cards.find(c=>c.element===el);if(card)focusCard(card)}dragMoved=false}else{const p=[...pointers.values()][0];pinch=null;pointerStart={...p,cx:desired.x,cy:desired.y}}});space.addEventListener('pointercancel',()=>{pointers.clear();dragging=false;pinch=null;space.classList.remove('dragging')});
+const canManagePhotos = !isDemo && typeof deletePhoto === 'function';
+$('#selected-actions').textContent = canManagePhotos ? '原图 / 删除' : '查看原图';
+const photoActions = mountPhotoActions({
+  canDelete: canManagePhotos,
+  onDelete: async record => {
+    await deletePhoto(record.id);
+    location.reload();
+  }
+});
+$('#selected-actions').addEventListener('click', () => photoActions.open(selected?.record));
+const pointers = new Map();
+let holdTimer = null, longPressed = false;
+function cancelHold() { clearTimeout(holdTimer); holdTimer = null; }
+function resetPan() {
+  cancelHold();
+  for (const id of pointers.keys()) if (space.hasPointerCapture(id)) space.releasePointerCapture(id);
+  pointers.clear(); dragging = false; pinch = null; pointerStart = null;
+  space.classList.remove('dragging');
+}
+space.addEventListener('pointerdown', e => {
+  if (e.button !== 0) return;
+  cancelHold(); longPressed = false;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { distance: Math.hypot(a.x-b.x, a.y-b.y), z: desired.z }; dragMoved = true;
+  }
+  dragging = true; pointerStart = { x:e.clientX, y:e.clientY, cx:desired.x, cy:desired.y };
+  if (pointers.size === 1) {
+    dragMoved = false;
+    const el = e.target.closest('.image-card');
+    const card = cards.find(c => c.element === el);
+    if (card && !flight) holdTimer = setTimeout(() => {
+      longPressed = true; dragMoved = true; resetPan(); photoActions.open(card.record);
+    }, 550);
+  }
+  space.setPointerCapture(e.pointerId); space.classList.add('dragging');
+});
+space.addEventListener('pointermove', e => {
+  if (!dragging || !pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if (pointers.size === 2 && pinch) {
+    cancelHold();
+    const [a,b] = [...pointers.values()]; releaseFocus();
+    desired.z = Math.max(-9000, Math.min(4500, pinch.z-(Math.hypot(a.x-b.x,a.y-b.y)-pinch.distance)*7)); return;
+  }
+  const dx=e.clientX-pointerStart.x, dy=e.clientY-pointerStart.y;
+  if (Math.hypot(dx,dy)>5) { cancelHold(); if (!dragMoved) releaseFocus(); dragMoved=true; }
+  if (dragMoved) {
+    const factor=Math.max(.5,(camera.z-(activeYear?planes.get(activeYear):0))/focal);
+    desired.x=pointerStart.cx-dx*factor; desired.y=pointerStart.cy-dy*factor; desired.yaw=0; desired.pitch=0;
+  }
+});
+space.addEventListener('pointerup', e => {
+  cancelHold();
+  if (!pointers.has(e.pointerId)) return;
+  const moved=dragMoved; pointers.delete(e.pointerId);
+  if (space.hasPointerCapture(e.pointerId)) space.releasePointerCapture(e.pointerId);
+  if (!pointers.size) {
+    resetPan();
+    if (!moved && !longPressed && !flight) {
+      const el=document.elementFromPoint(e.clientX,e.clientY)?.closest('.image-card');
+      focusCard(cards.find(c=>c.element===el));
+    }
+    dragMoved=false;
+  } else { const p=[...pointers.values()][0]; pinch=null; pointerStart={...p,cx:desired.x,cy:desired.y}; }
+});
+space.addEventListener('pointercancel', resetPan);
+space.addEventListener('lostpointercapture', e => { if (pointers.has(e.pointerId)) resetPan(); });
+addEventListener('blur', resetPan);
+document.addEventListener('visibilitychange', () => { if (document.hidden) resetPan(); });
+space.addEventListener('click', e => { if (longPressed && e.detail !== 0) { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+space.addEventListener('contextmenu', e => {
+  const el=e.target.closest('.image-card'), card=cards.find(c=>c.element===el);
+  if (!card) return;
+  e.preventDefault(); longPressed=true; resetPan(); photoActions.open(card.record);
+});
+space.addEventListener('keydown', e => {
+  if (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10')) return;
+  const el=e.target.closest('.image-card'), card=cards.find(c=>c.element===el);
+  if (card) { e.preventDefault(); photoActions.open(card.record); }
+});
 space.addEventListener('wheel',e=>{e.preventDefault();releaseFocus();if(e.shiftKey)desired.x+=e.deltaY*1.5;else desired.z=Math.max(Math.min(...planes.values())-300,Math.min(6000,desired.z-e.deltaY*1.8));desired.x+=e.deltaX*1.4},{passive:false});
 // Retain the project's structured search capability.
 if(document.modelContext?.registerTool){const lifecycle=new AbortController();try{Promise.resolve(document.modelContext.registerTool({name:'navigate_to_image',title:'寻找一段日常',description:'Search the local image atlas by a year, title or keyword and focus an image.',inputSchema:{type:'object',properties:{query:{type:'string',minLength:1,maxLength:150}},required:['query'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:async v=>{if(!v||typeof v.query!=='string'||!v.query.trim()||v.query.length>150||Object.keys(v).some(k=>k!=='query'))throw new Error('Enter a keyword of up to 150 characters.');return search(v.query.trim())}},{signal:lifecycle.signal})).catch(()=>{})}catch{}addEventListener('pagehide',()=>lifecycle.abort(),{once:true})}
