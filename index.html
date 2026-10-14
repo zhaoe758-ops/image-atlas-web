@@ -17,8 +17,8 @@
 <button class="library-button" id="open-library" type="button"><span aria-hidden="true">＋</span> 添加照片</button>
 <button class="library-button" id="open-share" type="button"><span aria-hidden="true">↗</span> 分享图集</button>
 <div class="time-note" id="time-note"><span id="period">ALL THE DAYS</span><p id="period-caption">日子，一圈一圈。</p></div>
-<div class="selection" id="selection" hidden><p id="selection-meta"></p><h1 id="selection-title"></h1><button id="selected-actions" type="button">原图 / 删除</button><div class="photo-controls"><button id="previous" aria-label="上一张照片">←</button><button id="back">回到年轮 <kbd>esc</kbd></button><button id="next" aria-label="下一张照片">→</button></div></div>
-<footer class="footer"><nav id="timeline" aria-label="按年份浏览照片"></nav><p class="instructions">拖拽探索 <span>·</span> 点击聚焦 <span>·</span> 长按查看原图 / 删除</p></footer>
+<div class="selection" id="selection" hidden><p id="selection-meta"></p><h1 id="selection-title"></h1><p id="selection-description" hidden></p><button id="selected-actions" type="button">照片操作</button><div class="photo-controls"><button id="previous" aria-label="上一张照片">←</button><button id="back">回到年轮 <kbd>esc</kbd></button><button id="next" aria-label="下一张照片">→</button></div></div>
+<footer class="footer"><nav id="timeline" aria-label="按年份浏览照片"></nav><p class="instructions">拖拽探索 <span>·</span> 点击聚焦 <span>·</span> 长按照片进行编辑</p></footer>
 <p class="sr-only" id="announcer" role="status" aria-live="polite"></p>
 <noscript><p class="no-script">请启用 JavaScript 浏览照片年轮。</p></noscript>
 <dialog id="library-dialog" aria-labelledby="library-title">
@@ -49,8 +49,20 @@
   <form method="dialog" class="dialog-heading"><div><span class="eyebrow">A CLOSER LOOK</span><h2 id="photo-actions-title">照片操作</h2></div><button class="close-dialog" aria-label="关闭照片操作">×</button></form>
   <p id="photo-actions-name"></p>
   <button id="view-original" class="primary-button" type="button">查看原图</button>
+  <button id="edit-photo" class="secondary-button" type="button">编辑简介</button>
   <button id="delete-photo" class="danger-button" type="button">删除照片</button>
   <p id="photo-actions-note" class="storage-note"></p>
+</dialog>
+<dialog id="photo-editor" class="photo-dialog" aria-labelledby="photo-editor-title">
+  <span class="eyebrow">THE STORY BEHIND IT</span><h2 id="photo-editor-title">编辑照片简介</h2>
+  <form id="photo-edit-form">
+    <label class="edit-field" for="edit-photo-title">照片标题<input id="edit-photo-title" type="text" maxlength="80" required placeholder="给这个片刻起个名字" autocomplete="off"></label>
+    <label class="edit-field" for="edit-photo-description">照片介绍 <span>可选</span><textarea id="edit-photo-description" rows="5" maxlength="2000" placeholder="记下地点、人物，或这张照片背后的故事…" aria-describedby="description-count"></textarea></label>
+    <p id="description-count" class="field-count">0 / 2000</p>
+    <p class="storage-note">保存后即可在图集中查看，也会包含在下次导出的分享网页里。内容仅保存在当前浏览器。</p>
+    <p id="edit-status" role="status" aria-live="polite"></p>
+    <div class="edit-buttons"><button id="cancel-edit" type="button">取消</button><button id="save-edit" class="primary-button" type="submit">保存修改</button></div>
+  </form>
 </dialog>
 <dialog id="delete-confirm" class="photo-dialog" aria-labelledby="delete-title">
   <h2 id="delete-title">删除这张照片？</h2><p id="delete-name"></p>
@@ -62,6 +74,7 @@
   <header class="original-heading"><div><h2 id="original-title"></h2><p id="original-info" role="status">正在加载原图…</p></div><form method="dialog"><button class="viewer-close" aria-label="关闭原图">×</button></form></header>
   <div class="original-tools"><button id="original-fit" type="button">适应屏幕</button><button id="original-actual" type="button">原始尺寸</button><button id="original-out" aria-label="缩小原图" type="button">−</button><output id="original-zoom">—</output><button id="original-in" aria-label="放大原图" type="button">＋</button></div>
   <div id="original-stage" tabindex="0" aria-label="原图，放大后可拖动查看"><div class="original-canvas"><img id="original-image" alt="" draggable="false"></div></div>
+  <p id="original-description" hidden></p>
   <p class="original-hint">原始图片 · 双指缩放 / 拖动查看 · Esc 关闭</p>
 </dialog>
 <script type="module" src="app.js"></script>

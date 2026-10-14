@@ -43,6 +43,30 @@ export async function deletePhoto(id) {
   });
 }
 
+export async function updatePhotoDetails(id, details) {
+  const title = String(details.title ?? '').trim();
+  const description = String(details.description ?? '').trim();
+  if (!title || title.length > 80) throw new Error('请填写 1–80 字的照片标题。');
+  if (description.length > 2000) throw new Error('照片介绍最多 2000 字。');
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction('photos', 'readwrite');
+    const store = transaction.objectStore('photos');
+    const request = store.get(id);
+    let missing = false;
+    request.onsuccess = () => {
+      if (!request.result) { missing = true; transaction.abort(); return; }
+      // Read and merge in one transaction; keep the original file and thumbnail intact.
+      store.put({ ...request.result, title, description });
+    };
+    transaction.oncomplete = () => resolve({ title, description });
+    transaction.onabort = () => reject(missing
+      ? new Error('这张照片已被删除，请刷新图集后重试。')
+      : transaction.error || new Error('保存失败，请重试。'));
+    transaction.onerror = () => {};
+  });
+}
+
 export async function preparePhoto(file, yearOverride) {
   if (!/\.(jpe?g|png|webp)$/i.test(file.name)) throw new Error('请使用 JPG、PNG 或 WebP 照片。');
   const bytes = await file.arrayBuffer();

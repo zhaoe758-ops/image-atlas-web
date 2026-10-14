@@ -48,3 +48,19 @@
 #original-image{display:block;flex-shrink:0;max-width:none;max-height:none;user-select:none;-webkit-user-drag:none;-webkit-touch-callout:none}
 .original-hint{text-align:center;margin:0;padding:12px 12px max(14px,env(safe-area-inset-bottom));font:11px/1.5 -apple-system,sans-serif;color:#abbdb1}
 @media(max-width:700px){.photo-dialog{padding:23px}.original-heading{padding-left:18px;padding-right:18px}.original-tools{gap:6px}.original-tools button{padding:9px 10px}.selection{bottom:108px}#selection-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+
+.secondary-button{display:block;width:100%;border:1px solid #cbd6cd;border-radius:8px;background:#edf3ee;color:#3e5649;font-size:14px;padding:12px;margin-top:12px}
+.secondary-button:hover{background:#e2ece4}
+#photo-editor{width:min(460px,calc(100vw - 32px))}
+.edit-field{display:block;font-size:13px;margin-top:18px}
+.edit-field>span{color:#819087;font-size:11px;margin-left:6px}
+.edit-field input,.edit-field textarea{display:block;box-sizing:border-box;width:100%;margin-top:8px;padding:11px 12px;border:1px solid #cbd6cd;border-radius:8px;background:white;color:#303a36;font:16px/1.7 -apple-system,BlinkMacSystemFont,sans-serif}
+.edit-field textarea{resize:vertical;min-height:130px;max-height:35dvh}
+.edit-field input:focus,.edit-field textarea:focus{outline:2px solid #9caf9f;outline-offset:1px}
+.field-count{text-align:right;color:#7b8b80;font:11px -apple-system,sans-serif;margin:8px 0}
+#edit-status{font:12px/1.7 -apple-system,sans-serif;color:#954d40}
+.edit-buttons{display:flex;gap:12px;margin-top:20px}
+.edit-buttons button{flex:1;padding:12px;border:1px solid #cbd6cd;border-radius:8px;font-size:14px}
+#cancel-edit{background:white}
+#selection-description{font:12px/1.65 -apple-system,sans-serif;color:#63776d;white-space:pre-wrap;overflow-wrap:anywhere;max-height:3.3em;overflow:auto;margin:0 0 9px}
+#original-description{flex-shrink:0;max-height:20dvh;overflow:auto;width:min(760px,100%);margin:0 auto;padding:12px 24px 0;font:14px/1.8 -apple-system,sans-serif;color:#d5e1d7;white-space:pre-wrap;overflow-wrap:anywhere;overscroll-behavior:contain}

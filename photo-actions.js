@@ -1,16 +1,19 @@
 // Original files are displayed directly; thumbnails are never enlarged here.
-export function mountPhotoActions({ canDelete, onDelete }) {
+export function mountPhotoActions({ canDelete, onDelete, canEdit = false, onEdit }) {
   const $ = selector => document.querySelector(selector);
   const menu = $('#photo-actions'), confirm = $('#delete-confirm'), viewer = $('#original-viewer');
   const image = $('#original-image'), stage = $('#original-stage');
+  const editor = $('#photo-editor'), titleInput = $('#edit-photo-title'), descriptionInput = $('#edit-photo-description');
+  let saving = false;
   let record = null, deleting = false, scale = 1, fitScale = 1, fitted = true, loaded = false;
   let gesture = null;
   const touches = new Map();
   const deleteButton = $('#delete-photo');
   deleteButton.hidden = !canDelete;
+  $('#edit-photo').hidden = !canEdit;
   $('#photo-actions-note').textContent = canDelete
-    ? '查看保存的原始图片，或删除当前浏览器中的这张照片。'
-    : '可查看图片原始尺寸。示例与分享图集不提供删除操作。';
+    ? '查看原图、编辑照片介绍，或删除当前浏览器中的照片。'
+    : '可查看原图与照片介绍。示例和分享图集仅供浏览。';
   function open(next) {
     if (!next || document.querySelector('dialog[open]')) return;
     record = next;
@@ -20,6 +23,34 @@ export function mountPhotoActions({ canDelete, onDelete }) {
   for (const dialog of [menu, viewer, confirm]) dialog.addEventListener('click', event => {
     const box = dialog.getBoundingClientRect();
     if (event.target === dialog && !deleting && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom)) dialog.close();
+  });
+  $('#edit-photo').addEventListener('click', () => {
+    if (!canEdit) return;
+    titleInput.value = record.title; descriptionInput.value = record.description || '';
+    $('#edit-status').textContent = ''; titleInput.setCustomValidity('');
+    updateCount(); menu.close(); editor.showModal();
+  });
+  function updateCount() { $('#description-count').textContent = `${descriptionInput.value.length} / 2000`; }
+  descriptionInput.addEventListener('input', updateCount);
+  titleInput.addEventListener('input', () => titleInput.setCustomValidity(''));
+  $('#cancel-edit').addEventListener('click', () => { if (!saving) editor.close(); });
+  editor.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+  $('#photo-edit-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!canEdit || saving) return;
+    titleInput.setCustomValidity(titleInput.value.trim() ? '' : '请填写照片标题。');
+    if (!event.currentTarget.reportValidity()) return;
+    saving = true;
+    for (const control of [titleInput, descriptionInput, $('#save-edit'), $('#cancel-edit')]) control.disabled = true;
+    $('#edit-status').textContent = '正在保存…';
+    try {
+      await onEdit(record, { title: titleInput.value, description: descriptionInput.value });
+      editor.close();
+    } catch (error) { $('#edit-status').textContent = error.message || '保存失败，请重试。'; }
+    finally {
+      saving = false;
+      for (const control of [titleInput, descriptionInput, $('#save-edit'), $('#cancel-edit')]) control.disabled = false;
+    }
   });
   function zoom(next, center = { x: stage.clientWidth / 2, y: stage.clientHeight / 2 }) {
     if (!loaded) return;
@@ -46,6 +77,8 @@ export function mountPhotoActions({ canDelete, onDelete }) {
   $('#view-original').addEventListener('click', () => {
     menu.close(); loaded = false; fitted = true; enableTools(false); image.hidden = true;
     $('#original-title').textContent = record.title;
+    $('#original-description').textContent = record.description || '';
+    $('#original-description').hidden = !record.description;
     $('#original-info').textContent = '正在加载原图…';
     $('#original-zoom').textContent = '—';
     image.alt = record.title; viewer.showModal();

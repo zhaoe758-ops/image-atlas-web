@@ -1,6 +1,6 @@
 import { initialImages as images, isDemo, mountLibrary } from './library.js';
 import { mountShare } from './share.js';
-import { deletePhoto } from './storage.js';
+import { deletePhoto, updatePhotoDetails } from './storage.js';
 import { mountPhotoActions } from './photo-actions.js';
 const $=s=>document.querySelector(s);
 const space=$('#space'),world=$('#world'),input=$('#search'),suggestions=$('#suggestions'),selection=$('#selection'),announcer=$('#announcer');
@@ -40,13 +40,13 @@ function flyTo(to,card=null){if(flight)flight.resolve({cancelled:true});selected
 function focusCard(card){if(!card)return Promise.resolve({found:false});closeSuggestions();input.blur();card.image.src=card.record.full;card.image.loading='eager';announcer.textContent=`正在移向 ${card.record.date} ${card.record.title}`;return flyTo(destination(card),card)}
 function clearSearch(){closeSuggestions();input.value='';$('#clear').hidden=true;lastQuery='';cycleIndex=-1}
 function goHome(){clearSearch();return cards.length===1?focusCard(cards[0]):flyTo(yearHome())}
-function settle(){document.body.classList.remove('flying');if(selected){selection.hidden=false;$('#selection-title').textContent=selected.record.title;$('#selection-meta').textContent=selected.record.date.replaceAll('-',' . ')+(selected.record.dateSource==='demo'?' · 示例日期':selected.record.dateSource==='file'?' · 文件日期':selected.record.dateSource==='manual'?' · 归档日期':'');announcer.textContent=`${selected.record.date}，${selected.record.title}`}else announcer.textContent=activeYear?`${activeYear} 年的照片`:'已返回全部年轮'}
+function settle(){document.body.classList.remove('flying');if(selected){selection.hidden=false;$('#selection-title').textContent=selected.record.title;$('#selection-description').textContent=selected.record.description||'';$('#selection-description').hidden=!selected.record.description;$('#selection-meta').textContent=selected.record.date.replaceAll('-',' . ')+(selected.record.dateSource==='demo'?' · 示例日期':selected.record.dateSource==='file'?' · 文件日期':selected.record.dateSource==='manual'?' · 归档日期':'');announcer.textContent=`${selected.record.date}，${selected.record.title}`}else announcer.textContent=activeYear?`${activeYear} 年的照片`:'已返回全部年轮'}
 function animate(now){const dt=Math.min(40,now-lastTime);lastTime=now;if(flight){const t=flight.duration?Math.min(1,(now-flight.start)/flight.duration):1,e=t*t*t*(t*(t*6-15)+10);for(const k of ['x','y','z','yaw','pitch'])camera[k]=flight.from[k]+(flight.to[k]-flight.from[k])*e;if(t>=1){const{resolve,to}=flight;flight=null;Object.assign(desired,to);settle();resolve({cancelled:false,image:selected?.record.id??null})}}else{const ease=reducedMotion?1:1-Math.exp(-dt*.009);for(const k of ['x','y','z','yaw','pitch'])camera[k]+=(desired[k]-camera[k])*ease}
  const frame=Object.values(camera).map(v=>v.toFixed(2)).join(',')+selected?.record.id;if(frame!==lastFrame){lastFrame=frame;world.style.transform=`translateZ(${focal}px) rotateX(${camera.pitch}deg) rotateY(${camera.yaw}deg) translate3d(${-camera.x}px,${-camera.y}px,${-camera.z}px)`;
  for(const card of cards){if(card.element.hidden)continue;const depth=camera.z-card.z;let opacity=Math.min(1,Math.max(0,(depth-90)/260));if(selected&&selected!==card)opacity*=.14;card.element.style.opacity=opacity;card.element.style.pointerEvents=opacity<.2?'none':'auto';card.element.tabIndex=opacity<.2?-1:0}
  for(const r of rings)r.el.style.opacity=selected?'.12':'1';}
  requestAnimationFrame(animate)}requestAnimationFrame(animate);
-function findImages(query){const q=norm(query);if(!q)return[];return images.map(record=>{const all=norm(`${record.title} ${record.tags} ${record.year} ${record.date} ${record.sourceFile}`);const score=norm(record.title)===q?100:all.includes(q)?60:q.split(' ').every(t=>all.includes(t))?30:0;return{record,score}}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||b.record.date.localeCompare(a.record.date)).map(x=>x.record)}
+function findImages(query){const q=norm(query);if(!q)return[];return images.map(record=>{const all=norm(`${record.title} ${record.description||''} ${record.tags} ${record.year} ${record.date} ${record.sourceFile}`);const score=norm(record.title)===q?100:all.includes(q)?60:q.split(' ').every(t=>all.includes(t))?30:0;return{record,score}}).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||b.record.date.localeCompare(a.record.date)).map(x=>x.record)}
 function closeSuggestions(){suggestions.hidden=true;input.setAttribute('aria-expanded','false')}
 function renderResults(){suggestions.replaceChildren();results=findImages(input.value).slice(0,7);resultIndex=0;const q=norm(input.value);$('#clear').hidden=!q;if(!q){closeSuggestions();return}suggestions.hidden=false;input.setAttribute('aria-expanded','true');if(!results.length){const p=document.createElement('p');p.className='empty';p.textContent='还没有找到。试试「吃饭」「房间」「背影」或一个年份。';suggestions.append(p);return}results.forEach((r,i)=>{const b=document.createElement('button');b.type='button';b.className='result'+(!i?' active':'');const img=document.createElement('img');img.src=r.src;img.alt='';const label=document.createElement('span');label.textContent=r.title;const hint=document.createElement('small');hint.textContent=r.date;label.append(hint);b.append(img,label);b.addEventListener('click',()=>selectResult(r));suggestions.append(b)})}
 function selectResult(r){if(activeYear!==null&&activeYear!==r.year){activeYear=r.year;updateYearUI()}return focusCard(cards.find(c=>c.record.id===r.id))}
@@ -57,9 +57,23 @@ function adjacent(step){if(!selected)return;const list=cards.filter(c=>activeYea
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('.search-shell'))closeSuggestions()});document.addEventListener('keydown',e=>{if(e.isComposing||document.querySelector('dialog[open]'))return;if(e.key==='Escape'){input.blur();goHome()}if(e.key==='/'&&document.activeElement!==input){e.preventDefault();input.focus()}if(e.target instanceof HTMLInputElement)return;if(selected&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();adjacent(e.key==='ArrowLeft'?-1:1);return}const move={ArrowLeft:[-180,0],ArrowRight:[180,0],ArrowUp:[0,-150],ArrowDown:[0,150]}[e.key];if(move&&!flight){e.preventDefault();releaseFocus();desired.x+=move[0];desired.y+=move[1]}});
 function releaseFocus(){if(flight){flight.resolve({cancelled:true});flight=null;Object.assign(desired,camera)}selected=null;selection.hidden=true;document.body.classList.remove('focused','flying');cards.forEach(setCardTransform);lastFrame=''}
 const canManagePhotos = !isDemo && typeof deletePhoto === 'function';
-$('#selected-actions').textContent = canManagePhotos ? '原图 / 删除' : '查看原图';
+$('#selected-actions').textContent = canManagePhotos ? '照片操作' : '查看原图';
 const photoActions = mountPhotoActions({
   canDelete: canManagePhotos,
+  canEdit: canManagePhotos,
+  onEdit: async (record, details) => {
+    const updated = await updatePhotoDetails(record.id, details);
+    Object.assign(record, updated);
+    const card = cards.find(c => c.record.id === record.id);
+    if (card) {
+      card.element.setAttribute('aria-label', `${record.date} · ${record.title}`);
+      card.image.alt = record.title;
+      card.element.querySelector('.caption').textContent = `${record.date} · ${record.title}`;
+    }
+    if (selected?.record.id === record.id) settle();
+    if (!suggestions.hidden) renderResults();
+    announcer.textContent = '照片简介已保存';
+  },
   onDelete: async record => {
     await deletePhoto(record.id);
     location.reload();
